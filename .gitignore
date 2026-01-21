@@ -1,0 +1,9 @@
+node_modules/
+.expo/
+dist/
+android/
+ios/
+*.keystore
+*.b64
+.env.local
+credentials.json
