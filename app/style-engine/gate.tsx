@@ -85,7 +85,7 @@ export default function GateScreen() {
       const membershipData = await membershipResponse.json();
 
       if (!membershipData.is_member) {
-        setError(membershipData.message || 'Membership not found. Please join TheGent Club on our website first.');
+        setError('Please use your registered email ID which you used for purchase');
         setIsLoading(false);
         return;
       }
@@ -100,9 +100,10 @@ export default function GateScreen() {
       const unlockData = await unlockResponse.json();
 
       if (unlockData.success) {
-        // Step 3: Save premium status and tier locally
+        // Step 3: Save premium status, email verified status and tier locally
         await AsyncStorage.setItem('sgc_is_premium', 'true');
         await AsyncStorage.setItem('sgc_email', email.toLowerCase().trim());
+        await AsyncStorage.setItem('sgc_email_verified', 'true');  // Mark as verified for future visits
         
         // Save membership tier from response (default to transformation for legacy members)
         const tier = unlockData.membership_tier || membershipData.membership?.plan || 'transformation';
@@ -123,42 +124,21 @@ export default function GateScreen() {
           }
         }
         
-        // Check if analysis has been completed
-        const hasAnalysis = await AsyncStorage.getItem('style_engine_face');
+        // Check if analysis has been completed (user came from processing screen)
         const hasCompletedAnalysis = await AsyncStorage.getItem('sgc_has_completed_analysis');
+        const hasBrainResult = await AsyncStorage.getItem('sgc_brain_result');
         
-        if (hasCompletedAnalysis === 'true' && hasAnalysis) {
-          // User has completed analysis - go to My Style
-          // Get all stored analysis data
-          const faceData = await AsyncStorage.getItem('style_engine_face');
-          const bodyData = await AsyncStorage.getItem('style_engine_body');
-          const skinData = await AsyncStorage.getItem('style_engine_skin');
-          const archetype = await AsyncStorage.getItem('style_engine_archetype');
-          const preferences = await AsyncStorage.getItem('style_engine_preferences');
-
-          // Save complete profile to backend
-          const profileResponse = await fetch(`${BACKEND_URL}/api/style-engine/complete`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              email: email.toLowerCase().trim(),
-              face: faceData ? JSON.parse(faceData) : {},
-              body: bodyData ? JSON.parse(bodyData) : {},
-              skin: skinData ? JSON.parse(skinData) : {},
-              archetype,
-              preferences: preferences ? JSON.parse(preferences) : {},
-            }),
+        if (hasCompletedAnalysis === 'true' && hasBrainResult) {
+          // User just completed analysis - go to results
+          router.replace({
+            pathname: '/style-engine/results',
+            params: { 
+              fromProcessing: 'true',
+              generateImages: 'true'
+            }
           });
-
-          if (profileResponse.ok) {
-            const profileData = await profileResponse.json();
-            await AsyncStorage.setItem('style_engine_complete', JSON.stringify(profileData));
-          }
-          
-          // Navigate to My Style tab
-          router.replace('/(tabs)/style');
         } else {
-          // User has NOT completed analysis - redirect to analysis flow intro screen
+          // User hasn't done analysis yet - go to analysis intro
           router.replace('/style-engine/analysis-intro');
         }
       } else {
@@ -236,11 +216,15 @@ export default function GateScreen() {
                 keyboardType="email-address"
                 autoCapitalize="none"
                 autoCorrect={false}
+                autoComplete="email"
+                textContentType="emailAddress"
                 value={email}
                 onChangeText={(text) => {
                   setEmail(text);
                   setError('');
                 }}
+                editable={true}
+                selectTextOnFocus={true}
               />
             </View>
             {error ? <Text style={styles.errorText}>{error}</Text> : null}
@@ -401,6 +385,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     fontSize: 16,
     color: COLORS.primary,
+    ...Platform.select({
+      web: {
+        outlineStyle: 'none',
+      },
+    }),
   },
   errorText: {
     fontSize: 13,

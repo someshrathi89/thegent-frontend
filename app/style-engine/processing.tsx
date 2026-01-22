@@ -215,15 +215,24 @@ export default function ProcessingScreen() {
       setPhase('complete');
       setStatusText('Identity unlocked!');
 
-      // Navigate to results after brief success animation
+      // Check if user is already verified (returning user)
+      const isVerified = await AsyncStorage.getItem('sgc_email_verified');
+      
+      // Navigate after brief success animation
       setTimeout(() => {
-        router.replace({
-          pathname: '/style-engine/results',
-          params: { 
-            fromProcessing: 'true',
-            generateImages: 'true' // Signal results to start Phase B
-          }
-        });
+        if (isVerified === 'true') {
+          // Returning verified user - go directly to results
+          router.replace({
+            pathname: '/style-engine/results',
+            params: { 
+              fromProcessing: 'true',
+              generateImages: 'true'
+            }
+          });
+        } else {
+          // New user - go to gate for email verification
+          router.replace('/style-engine/gate');
+        }
       }, 1000);
 
     } catch (error: any) {

@@ -282,7 +282,7 @@ export default function HomeScreen() {
               <Text style={styles.taskInstruction}>
                 Complete your style analysis to begin your 90-day transformation.
               </Text>
-              {renderCTAButton('Start Style Analysis', () => router.push('/style-engine/gate'))}
+              {renderCTAButton('Start Style Analysis', () => router.push('/style-engine/analysis-intro'))}
             </View>
           </View>
         </View>
