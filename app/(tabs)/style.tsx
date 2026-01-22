@@ -30,24 +30,193 @@ const COLORS = {
 
 const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL;
 
-// Color swatches mapping
+// Comprehensive color hex mapping
 const COLOR_HEX_MAP: { [key: string]: string } = {
+  // Blues
   'Navy': '#1B3A57',
-  'Burgundy': '#722F37',
+  'Navy Blue': '#000080',
+  'Royal Blue': '#4169E1',
+  'Slate Blue': '#6A5ACD',
+  'Deep Teal': '#014D4E',
+  'Teal': '#008080',
+  'Light Blue': '#ADD8E6',
+  'Sky Blue': '#87CEEB',
+  'Cobalt': '#0047AB',
+  'Powder Blue': '#B0E0E6',
+  'Steel Blue': '#4682B4',
+  'Denim': '#1560BD',
+  
+  // Greens
   'Forest Green': '#228B22',
+  'Olive': '#808000',
+  'Sage': '#9DC183',
+  'Emerald': '#50C878',
+  'Hunter Green': '#355E3B',
+  'Moss': '#8A9A5B',
+  'Mint': '#98FF98',
+  'Seafoam': '#71EEB8',
+  'Pine': '#01796F',
+  'Kelly Green': '#4CBB17',
+  'Jade': '#00A86B',
+  'Olive Green': '#808000',
+  'Dark Green': '#006400',
+  'Light Green': '#90EE90',
+  'Army Green': '#4B5320',
+  
+  // Browns/Neutrals
   'Camel': '#C19A6B',
   'Charcoal': '#36454F',
-  'Cream': '#FFFDD0',
-  'Olive': '#808000',
-  'Slate Blue': '#6A5ACD',
-  'Rust': '#B7410E',
   'Taupe': '#483C32',
-  'Deep Teal': '#014D4E',
   'Chocolate': '#7B3F00',
-  'Ivory': '#FFFFF0',
-  'Sage': '#9DC183',
-  'Terracotta': '#E2725B',
+  'Tan': '#D2B48C',
+  'Beige': '#F5F5DC',
+  'Khaki': '#C3B091',
+  'Sand': '#C2B280',
   'Stone': '#928E85',
+  'Pewter': '#8F8F8F',
+  'Espresso': '#3C2415',
+  'Cognac': '#9A463D',
+  'Mocha': '#967969',
+  'Chestnut': '#954535',
+  'Coffee': '#6F4E37',
+  'Dark Brown': '#654321',
+  'Light Brown': '#B5651D',
+  'Walnut': '#773F1A',
+  
+  // Reds/Pinks
+  'Burgundy': '#722F37',
+  'Rust': '#B7410E',
+  'Wine': '#722F37',
+  'Terracotta': '#E2725B',
+  'Coral': '#FF7F50',
+  'Brick': '#CB4154',
+  'Maroon': '#800000',
+  'Crimson': '#DC143C',
+  'Salmon': '#FA8072',
+  'Dusty Rose': '#DCAE96',
+  'Blush': '#DE5D83',
+  'Rose': '#FF007F',
+  'Berry': '#8E4585',
+  'Cranberry': '#9E003A',
+  'Cherry': '#DE3163',
+  
+  // Yellows/Oranges
+  'Mustard': '#FFDB58',
+  'Gold': '#FFD700',
+  'Amber': '#FFBF00',
+  'Honey': '#EB9605',
+  'Marigold': '#EAA221',
+  'Ochre': '#CC7722',
+  'Burnt Orange': '#CC5500',
+  'Tangerine': '#FF9966',
+  'Peach': '#FFCBA4',
+  'Apricot': '#FBCEB1',
+  'Pumpkin': '#FF7518',
+  'Copper': '#B87333',
+  
+  // Purples
+  'Plum': '#8E4585',
+  'Eggplant': '#614051',
+  'Lavender': '#E6E6FA',
+  'Mauve': '#E0B0FF',
+  'Violet': '#EE82EE',
+  'Grape': '#6F2DA8',
+  'Aubergine': '#3D0C02',
+  'Lilac': '#C8A2C8',
+  'Orchid': '#DA70D6',
+  'Mulberry': '#C54B8C',
+  
+  // Whites/Creams
+  'Cream': '#FFFDD0',
+  'Ivory': '#FFFFF0',
+  'White': '#FFFFFF',
+  'Off-White': '#FAF9F6',
+  'Pearl': '#FDEEF4',
+  'Eggshell': '#F0EAD6',
+  'Linen': '#FAF0E6',
+  'Champagne': '#F7E7CE',
+  'Vanilla': '#F3E5AB',
+  
+  // Grays/Blacks
+  'Black': '#000000',
+  'Gray': '#808080',
+  'Grey': '#808080',
+  'Light Gray': '#D3D3D3',
+  'Light Grey': '#D3D3D3',
+  'Dark Gray': '#A9A9A9',
+  'Dark Grey': '#A9A9A9',
+  'Silver': '#C0C0C0',
+  'Slate': '#708090',
+  'Graphite': '#383838',
+  'Onyx': '#353839',
+  'Jet Black': '#0A0A0A',
+};
+
+// Helper function to get color hex with fallback
+const getColorHex = (colorName: string): string => {
+  if (!colorName) return '#888888';
+  
+  const trimmedName = colorName.trim();
+  
+  // Direct match
+  if (COLOR_HEX_MAP[trimmedName]) {
+    return COLOR_HEX_MAP[trimmedName];
+  }
+  
+  // Try case-insensitive exact match
+  const lowerName = trimmedName.toLowerCase();
+  for (const [key, value] of Object.entries(COLOR_HEX_MAP)) {
+    if (key.toLowerCase() === lowerName) {
+      return value;
+    }
+  }
+  
+  // Try matching with common variations (e.g., "Olive Green" -> "Olive")
+  const words = lowerName.split(/\s+/);
+  
+  // Check each word individually for a match
+  for (const word of words) {
+    for (const [key, value] of Object.entries(COLOR_HEX_MAP)) {
+      if (key.toLowerCase() === word) {
+        return value;
+      }
+    }
+  }
+  
+  // Try partial match - check if color name contains any key
+  for (const [key, value] of Object.entries(COLOR_HEX_MAP)) {
+    const keyLower = key.toLowerCase();
+    if (lowerName.includes(keyLower) || keyLower.includes(lowerName)) {
+      return value;
+    }
+  }
+  
+  // Common color word extraction
+  const colorKeywords: { [key: string]: string } = {
+    'green': '#228B22',
+    'blue': '#1B3A57',
+    'red': '#DC143C',
+    'brown': '#8B4513',
+    'orange': '#FF8C00',
+    'yellow': '#FFD700',
+    'purple': '#800080',
+    'pink': '#FFC0CB',
+    'gray': '#808080',
+    'grey': '#808080',
+    'black': '#000000',
+    'white': '#FFFFFF',
+    'tan': '#D2B48C',
+    'beige': '#F5F5DC',
+  };
+  
+  for (const [keyword, hex] of Object.entries(colorKeywords)) {
+    if (lowerName.includes(keyword)) {
+      return hex;
+    }
+  }
+  
+  // Default gray for truly unknown colors
+  return '#888888';
 };
 
 // Banned colors based on skin tone
@@ -737,7 +906,7 @@ export default function MyStyleScreen() {
                     <View
                       style={[
                         styles.colorSwatch,
-                        { backgroundColor: COLOR_HEX_MAP[color] || '#888' },
+                        { backgroundColor: getColorHex(color) },
                       ]}
                     />
                     <Text style={styles.colorSwatchLabel}>{color}</Text>

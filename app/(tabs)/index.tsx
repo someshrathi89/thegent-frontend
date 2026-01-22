@@ -72,6 +72,7 @@ export default function HomeScreen() {
   const [firstName, setFirstName] = useState<string>('');
   const [todayTask, setTodayTask] = useState<TodayTaskResponse | null>(null);
   const [markingDone, setMarkingDone] = useState(false);
+  const [hasLocalAnalysis, setHasLocalAnalysis] = useState(false);
   
   // Scroll animation for header glassmorphism
   const scrollY = useRef(new Animated.Value(0)).current;
@@ -103,9 +104,15 @@ export default function HomeScreen() {
     try {
       const storedPhone = await AsyncStorage.getItem('sgc_phone');
       const storedFirstName = await AsyncStorage.getItem('user_first_name');
+      const hasCompletedAnalysis = await AsyncStorage.getItem('sgc_has_completed_analysis');
       
       if (storedFirstName) {
         setFirstName(storedFirstName);
+      }
+      
+      // Check if user has completed local analysis
+      if (hasCompletedAnalysis === 'true') {
+        setHasLocalAnalysis(true);
       }
       
       if (storedPhone) {
@@ -228,8 +235,35 @@ export default function HomeScreen() {
   const renderTaskCard = () => {
     if (!todayTask) return null;
 
-    // Not started - needs analysis
+    // Not started - needs analysis (but check local state too)
     if (!todayTask.has_started) {
+      // If user has completed analysis locally, show "View Your Style" instead
+      if (hasLocalAnalysis) {
+        return (
+          <View style={styles.glassCardWrapper}>
+            <View style={styles.glassCard}>
+              <View style={styles.glassCardInner}>
+                <View style={styles.taskHeader}>
+                  <View style={styles.taskIconContainer}>
+                    <View style={styles.iconGlowOuter} />
+                    <View style={styles.iconGlowInner} />
+                    <Ionicons name="checkmark-circle" size={28} color={COLORS.accent} />
+                  </View>
+                  <View style={styles.taskHeaderText}>
+                    <Text style={styles.taskLabel}>ANALYSIS COMPLETE</Text>
+                    <Text style={styles.taskTitle}>Your Style Blueprint</Text>
+                  </View>
+                </View>
+                <Text style={styles.taskInstruction}>
+                  Your personalized style analysis is ready. View your color palette, style recommendations, and more.
+                </Text>
+                {renderCTAButton('View My Style', () => router.push('/(tabs)/style'))}
+              </View>
+            </View>
+          </View>
+        );
+      }
+      
       return (
         <View style={styles.glassCardWrapper}>
           <View style={styles.glassCard}>
@@ -248,7 +282,7 @@ export default function HomeScreen() {
               <Text style={styles.taskInstruction}>
                 Complete your style analysis to begin your 90-day transformation.
               </Text>
-              {renderCTAButton('Start Style Analysis', () => router.push('/style-engine'))}
+              {renderCTAButton('Start Style Analysis', () => router.push('/style-engine/gate'))}
             </View>
           </View>
         </View>
