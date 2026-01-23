@@ -342,6 +342,7 @@ export default function MyStyleScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [hasCompletedAnalysis, setHasCompletedAnalysis] = useState(false);
   const [isPremium, setIsPremium] = useState(false);
+  const [isEmailVerified, setIsEmailVerified] = useState(false);
   const [analysisMode, setAnalysisMode] = useState<AnalysisMode | null>(null);
   const [isResetting, setIsResetting] = useState(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -504,6 +505,10 @@ export default function MyStyleScreen() {
   const checkStatusAndLoadProfile = async () => {
     setIsLoading(true);
     try {
+      // Check email verification status FIRST
+      const emailVerified = await AsyncStorage.getItem('sgc_email_verified');
+      setIsEmailVerified(emailVerified === 'true');
+      
       // Check local storage first - prioritize cached data for instant display
       const localPremium = await AsyncStorage.getItem('sgc_is_premium');
       const localAnalysis = await AsyncStorage.getItem('sgc_has_completed_analysis');
@@ -516,6 +521,12 @@ export default function MyStyleScreen() {
       
       if (localPremium === 'true') {
         setIsPremium(true);
+      }
+      
+      // Only load profile data if email is verified
+      if (emailVerified !== 'true') {
+        setIsLoading(false);
+        return;
       }
       
       // If we have cached brain result, show it immediately
@@ -796,6 +807,64 @@ export default function MyStyleScreen() {
 
             <Text style={styles.timeEstimate}>
               <Ionicons name="time-outline" size={12} color={COLORS.muted} /> Estimated time: 2-3 minutes
+            </Text>
+          </View>
+        </ScrollView>
+      </View>
+    );
+  }
+
+  // Analysis complete but email NOT verified - show locked state with gate redirect
+  if (hasCompletedAnalysis && !isEmailVerified) {
+    return (
+      <View style={[styles.container, { paddingTop: insets.top }]}>
+        <ScrollView
+          contentContainerStyle={styles.lockedContainer}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.accent} />
+          }
+        >
+          <View style={styles.lockedContent}>
+            {/* Lock Icon */}
+            <View style={styles.lockedIconContainer}>
+              <Ionicons name="lock-closed" size={56} color={COLORS.accent} />
+            </View>
+            
+            <Text style={styles.lockedTitle}>Results Locked</Text>
+            <Text style={styles.lockedSubtitle}>
+              Your style analysis is complete! To view your personalized results, please verify your membership email.
+            </Text>
+
+            {/* Blurred Preview */}
+            <View style={styles.blurredPreviewCard}>
+              <View style={styles.blurredRow}>
+                <View style={[styles.blurredBox, { width: 80 }]} />
+                <View style={[styles.blurredBox, { width: 100 }]} />
+              </View>
+              <View style={styles.blurredRow}>
+                <View style={[styles.blurredBox, { width: 120 }]} />
+              </View>
+              <View style={styles.blurredColors}>
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <View key={i} style={styles.blurredColorSwatch} />
+                ))}
+              </View>
+              <View style={styles.lockOverlaySmall}>
+                <Ionicons name="lock-closed" size={24} color={COLORS.accent} />
+              </View>
+            </View>
+
+            {/* CTA Button */}
+            <TouchableOpacity 
+              style={styles.beginButton} 
+              onPress={() => router.push('/style-engine/gate')}
+            >
+              <Ionicons name="mail-outline" size={20} color={COLORS.white} />
+              <Text style={styles.beginButtonText}>Verify Email to Unlock</Text>
+            </TouchableOpacity>
+
+            <Text style={styles.timeEstimate}>
+              <Ionicons name="shield-checkmark-outline" size={12} color={COLORS.muted} /> Use your purchase email
             </Text>
           </View>
         </ScrollView>
@@ -1848,5 +1917,50 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: COLORS.accent,
+  },
+  // Blurred preview styles for locked state
+  blurredPreviewCard: {
+    backgroundColor: COLORS.white,
+    borderRadius: 16,
+    padding: 20,
+    marginTop: 24,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: COLORS.lightBorder,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  blurredRow: {
+    flexDirection: 'row',
+    marginBottom: 12,
+  },
+  blurredBox: {
+    height: 16,
+    backgroundColor: '#E8E6E1',
+    borderRadius: 8,
+    marginRight: 10,
+  },
+  blurredColors: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginVertical: 16,
+  },
+  blurredColorSwatch: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#D4D4D4',
+    marginHorizontal: 4,
+  },
+  lockOverlaySmall: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255,255,255,0.7)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 16,
   },
 });

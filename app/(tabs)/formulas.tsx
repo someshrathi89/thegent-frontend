@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { trackOpenedFormulas, trackOutfitImageGenerated } from '../../utils/analytics';
 
@@ -69,6 +70,7 @@ export default function FormulasScreen() {
   const [generatedImages, setGeneratedImages] = useState<{ [key: string]: string }>({});
   const [generatingOutfit, setGeneratingOutfit] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isEmailVerified, setIsEmailVerified] = useState(false);
   const [phone, setPhone] = useState<string | null>(null);
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
@@ -101,6 +103,16 @@ export default function FormulasScreen() {
 
   const loadCatalog = async () => {
     try {
+      // Check email verification status FIRST
+      const emailVerified = await AsyncStorage.getItem('sgc_email_verified');
+      setIsEmailVerified(emailVerified === 'true');
+      
+      // If not verified, stop loading and show locked state
+      if (emailVerified !== 'true') {
+        setIsLoading(false);
+        return;
+      }
+      
       const storedPhone = await AsyncStorage.getItem('sgc_phone');
       setPhone(storedPhone?.replace('+1', '') || null);
 
@@ -257,6 +269,28 @@ export default function FormulasScreen() {
       <View style={[styles.container, styles.centerContent, { paddingTop: insets.top }]}>
         <ActivityIndicator size="large" color={COLORS.accent} />
         <Text style={styles.loadingText}>Loading your formulas...</Text>
+      </View>
+    );
+  }
+
+  // Email not verified - show locked state
+  if (!isEmailVerified) {
+    return (
+      <View style={[styles.container, styles.centerContent, { paddingTop: insets.top }]}>
+        <View style={styles.emptyState}>
+          <Ionicons name="lock-closed" size={64} color={COLORS.accent} />
+          <Text style={styles.emptyTitle}>Formulas Locked</Text>
+          <Text style={styles.emptyText}>
+            Verify your membership email to unlock your personalized outfit formulas.
+          </Text>
+          <TouchableOpacity 
+            style={styles.unlockButton}
+            onPress={() => router.push('/style-engine/gate')}
+          >
+            <Ionicons name="mail-outline" size={20} color={COLORS.white} />
+            <Text style={styles.unlockButtonText}>Verify Email to Unlock</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     );
   }
@@ -647,5 +681,21 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: COLORS.primary,
     lineHeight: 22,
+  },
+  // Unlock button styles
+  unlockButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.accent,
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    borderRadius: 25,
+    marginTop: 20,
+  },
+  unlockButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: COLORS.white,
+    marginLeft: 8,
   },
 });
