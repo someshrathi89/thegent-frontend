@@ -88,15 +88,12 @@ export default function FormulasScreen() {
         useNativeDriver: true,
       }).start();
 
-      // Auto-expand first context
+      // Auto-expand first context (but don't auto-generate images)
+      // Image generation is now manual to prevent app hangs when Gemini API is down
       if (catalog.contexts.length > 0 && !expandedContext) {
         setExpandedContext(catalog.contexts[0].context_name);
-        
-        // Auto-generate first outfit image if not already generated
-        const firstOutfitId = getOutfitId(catalog.contexts[0].context_name, 0);
-        if (!generatedImages[firstOutfitId]) {
-          generateOutfitImage(catalog.contexts[0].outfits[0], catalog.contexts[0].context_name, 0);
-        }
+        // Removed auto-generate to implement graceful degradation
+        // Users can manually generate images using the "Generate This Look" button
       }
     }
   }, [catalog]);
@@ -216,6 +213,8 @@ export default function FormulasScreen() {
     return `${contextName.toLowerCase().replace(/[^a-z0-9]/g, '-')}-${index}`;
   };
 
+  const [imageError, setImageError] = useState<string | null>(null);
+
   const generateOutfitImage = async (outfit: OutfitItem, contextName: string, index: number) => {
     const outfitId = getOutfitId(contextName, index);
     
@@ -224,6 +223,11 @@ export default function FormulasScreen() {
     }
 
     setGeneratingOutfit(outfitId);
+    setImageError(null);
+
+    // Create abort controller for timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
 
     try {
       const response = await fetch(`${BACKEND_URL}/api/sgc-brain/generate-single-image`, {
@@ -236,8 +240,11 @@ export default function FormulasScreen() {
           outfit_title: outfit.title,
           head_to_toe: outfit.head_to_toe || [],
           phone: phone
-        })
+        }),
+        signal: controller.signal
       });
+
+      clearTimeout(timeoutId);
 
       if (response.ok) {
         const data = await response.json();
@@ -251,10 +258,20 @@ export default function FormulasScreen() {
           
           // Cache locally
           await AsyncStorage.setItem('sgc_generated_images', JSON.stringify(newImages));
+        } else {
+          setImageError('Image generation failed. Please try again.');
         }
+      } else {
+        setImageError('Service temporarily unavailable. Please try again later.');
       }
-    } catch (error) {
+    } catch (error: any) {
+      clearTimeout(timeoutId);
       console.error('Error generating image:', error);
+      if (error.name === 'AbortError') {
+        setImageError('Request timed out. Please try again.');
+      } else {
+        setImageError('Service temporarily unavailable. Please try again later.');
+      }
     } finally {
       setGeneratingOutfit(null);
     }
@@ -361,6 +378,7 @@ export default function FormulasScreen() {
                       const outfitId = getOutfitId(context.context_name, index);
                       const hasImage = !!generatedImages[outfitId];
                       const isGenerating = generatingOutfit === outfitId;
+                      const showError = imageError && !isGenerating && !hasImage;
 
                       return (
                         <View key={outfitId} style={styles.outfitCard}>
@@ -378,6 +396,22 @@ export default function FormulasScreen() {
                                   <View style={styles.generatingContainer}>
                                     <ActivityIndicator size="large" color={COLORS.accent} />
                                     <Text style={styles.generatingText}>Generating look...</Text>
+                                  </View>
+                                ) : showError ? (
+                                  <View style={styles.errorContainer}>
+                                    <Ionicons name="cloud-offline-outline" size={32} color={COLORS.muted} />
+                                    <Text style={styles.errorText}>{imageError}</Text>
+                                    <TouchableOpacity
+                                      style={styles.retryButton}
+                                      onPress={() => {
+                                        setImageError(null);
+                                        generateOutfitImage(outfit, context.context_name, index);
+                                      }}
+                                      activeOpacity={0.8}
+                                    >
+                                      <Ionicons name="refresh" size={18} color={COLORS.accent} />
+                                      <Text style={styles.retryButtonText}>Try Again</Text>
+                                    </TouchableOpacity>
                                   </View>
                                 ) : (
                                   <TouchableOpacity
@@ -697,5 +731,35 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: COLORS.white,
     marginLeft: 8,
+  },
+  // Error state styles
+  errorContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20,
+  },
+  errorText: {
+    marginTop: 12,
+    marginBottom: 16,
+    fontSize: 14,
+    color: COLORS.muted,
+    textAlign: 'center',
+    lineHeight: 20,
+    paddingHorizontal: 20,
+  },
+  retryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: COLORS.accent,
+  },
+  retryButtonText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: COLORS.accent,
+    marginLeft: 6,
   },
 });

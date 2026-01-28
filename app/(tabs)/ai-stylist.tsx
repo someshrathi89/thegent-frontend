@@ -310,6 +310,10 @@ export default function AIStylistScreen() {
     setIsLoading(true);
     Keyboard.dismiss();
 
+    // Create abort controller for timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+
     try {
       // Get phone for user-specific grounding
       const phone = await AsyncStorage.getItem('sgc_phone');
@@ -323,7 +327,10 @@ export default function AIStylistScreen() {
           history: messages.map(m => ({ role: m.role, content: m.content })),
           phone: cleanPhone,
         }),
+        signal: controller.signal
       });
+
+      clearTimeout(timeoutId);
 
       if (response.ok) {
         const data = await response.json();
@@ -337,11 +344,16 @@ export default function AIStylistScreen() {
       } else {
         throw new Error('Failed to get response');
       }
-    } catch (error) {
+    } catch (error: any) {
+      clearTimeout(timeoutId);
+      let errorContent = 'I apologize, but I\'m having trouble connecting right now. Please try again in a moment.';
+      if (error.name === 'AbortError') {
+        errorContent = 'The request took too long. The AI service may be temporarily unavailable. Please try again.';
+      }
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: 'I apologize, but I\'m having trouble connecting right now. Please try again in a moment.',
+        content: errorContent,
         timestamp: new Date(),
       };
       setMessages(prev => [...prev, errorMessage]);

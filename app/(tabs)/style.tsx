@@ -372,18 +372,22 @@ export default function MyStyleScreen() {
     }
   }, [profile]);
 
-  // Auto-generate first hairstyle and beard images when data is loaded
-  useEffect(() => {
-    if (barberSection?.hairstyles?.[0] && !hairstyleImages[0] && generatingHairstyle !== 0) {
-      generateHeadshotImage('hairstyle', 0, barberSection.hairstyles[0]);
-    }
-  }, [barberSection]);
+  // Removed auto-generate - user can manually generate images when Gemini is available
+  // This prevents the app from hanging when Gemini is down
+  // useEffect(() => {
+  //   if (barberSection?.hairstyles?.[0] && !hairstyleImages[0] && generatingHairstyle !== 0) {
+  //     generateHeadshotImage('hairstyle', 0, barberSection.hairstyles[0]);
+  //   }
+  // }, [barberSection]);
 
-  useEffect(() => {
-    if (beardSection?.beard_styles?.[0] && !beardImages[0] && generatingBeard !== 0) {
-      generateHeadshotImage('beard', 0, beardSection.beard_styles[0]);
-    }
-  }, [beardSection]);
+  // useEffect(() => {
+  //   if (beardSection?.beard_styles?.[0] && !beardImages[0] && generatingBeard !== 0) {
+  //     generateHeadshotImage('beard', 0, beardSection.beard_styles[0]);
+  //   }
+  // }, [beardSection]);
+
+  // State for error handling
+  const [headshotError, setHeadshotError] = useState<string | null>(null);
 
   // Generate headshot image function
   const generateHeadshotImage = async (
@@ -396,6 +400,11 @@ export default function MyStyleScreen() {
     } else {
       setGeneratingBeard(index);
     }
+    setHeadshotError(null);
+
+    // Create abort controller for timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
 
     try {
       const response = await fetch(`${BACKEND_URL}/api/sgc-brain/generate-headshot-image`, {
@@ -407,7 +416,10 @@ export default function MyStyleScreen() {
           description: style.description,
           phone: phone,
         }),
+        signal: controller.signal
       });
+
+      clearTimeout(timeoutId);
 
       if (response.ok) {
         const data = await response.json();
@@ -417,10 +429,20 @@ export default function MyStyleScreen() {
           } else {
             setBeardImages(prev => ({ ...prev, [index]: data.image_base64 }));
           }
+        } else {
+          setHeadshotError('Image generation failed. Please try again.');
         }
+      } else {
+        setHeadshotError('Service temporarily unavailable. Please try again later.');
       }
-    } catch (error) {
+    } catch (error: any) {
+      clearTimeout(timeoutId);
       console.error(`Error generating ${styleType} image:`, error);
+      if (error.name === 'AbortError') {
+        setHeadshotError('Request timed out. Please try again.');
+      } else {
+        setHeadshotError('Service temporarily unavailable. Please try again later.');
+      }
     } finally {
       if (styleType === 'hairstyle') {
         setGeneratingHairstyle(null);
@@ -1051,6 +1073,21 @@ export default function MyStyleScreen() {
                         <ActivityIndicator size="large" color={COLORS.accent} />
                         <Text style={styles.generatingText}>Generating preview...</Text>
                       </View>
+                    ) : headshotError && generatingHairstyle === null ? (
+                      <View style={styles.errorContainer}>
+                        <Ionicons name="cloud-offline-outline" size={32} color={COLORS.muted} />
+                        <Text style={styles.errorText}>{headshotError}</Text>
+                        <TouchableOpacity
+                          style={styles.retryButton}
+                          onPress={() => {
+                            setHeadshotError(null);
+                            generateHeadshotImage('hairstyle', index, style);
+                          }}
+                        >
+                          <Ionicons name="refresh" size={18} color={COLORS.accent} />
+                          <Text style={styles.retryButtonText}>Try Again</Text>
+                        </TouchableOpacity>
+                      </View>
                     ) : (
                       <TouchableOpacity
                         style={styles.generateButton}
@@ -1106,6 +1143,21 @@ export default function MyStyleScreen() {
                       <View style={styles.styleImagePlaceholder}>
                         <ActivityIndicator size="large" color={COLORS.accent} />
                         <Text style={styles.generatingText}>Generating preview...</Text>
+                      </View>
+                    ) : headshotError && generatingBeard === null ? (
+                      <View style={styles.errorContainer}>
+                        <Ionicons name="cloud-offline-outline" size={32} color={COLORS.muted} />
+                        <Text style={styles.errorText}>{headshotError}</Text>
+                        <TouchableOpacity
+                          style={styles.retryButton}
+                          onPress={() => {
+                            setHeadshotError(null);
+                            generateHeadshotImage('beard', index, style);
+                          }}
+                        >
+                          <Ionicons name="refresh" size={18} color={COLORS.accent} />
+                          <Text style={styles.retryButtonText}>Try Again</Text>
+                        </TouchableOpacity>
                       </View>
                     ) : (
                       <TouchableOpacity
@@ -1962,5 +2014,39 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 16,
+  },
+  // Error state styles for graceful degradation
+  errorContainer: {
+    width: '100%',
+    height: 120,
+    borderRadius: 12,
+    backgroundColor: '#F9F8F4',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.lightBorder,
+  },
+  errorText: {
+    marginTop: 10,
+    marginBottom: 12,
+    fontSize: 13,
+    color: COLORS.muted,
+    textAlign: 'center',
+    paddingHorizontal: 16,
+  },
+  retryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: COLORS.accent,
+  },
+  retryButtonText: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: COLORS.accent,
+    marginLeft: 6,
   },
 });
