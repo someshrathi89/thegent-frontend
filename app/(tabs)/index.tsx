@@ -87,14 +87,26 @@ export default function HomeScreen() {
   };
 
   const fetchTodayTask = async (userPhone: string) => {
+    // Create abort controller with timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+    
     try {
-      const response = await fetch(`${BACKEND_URL}/api/transformation/today-task?phone=${userPhone}`);
+      const response = await fetch(`${BACKEND_URL}/api/transformation/today-task?phone=${userPhone}`, {
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
       if (response.ok) {
         const data = await response.json();
         setTodayTask(data);
       }
-    } catch (error) {
-      console.log('Error fetching today task:', error);
+    } catch (error: any) {
+      clearTimeout(timeoutId);
+      if (error.name === 'AbortError') {
+        console.log('Today task fetch timed out');
+      } else {
+        console.log('Error fetching today task:', error);
+      }
     } finally {
       setLoading(false);
     }

@@ -137,8 +137,15 @@ export default function MyStyleJourneyScreen() {
   };
 
   const fetchTransformationTasks = async (userPhone: string) => {
+    // Create abort controller with timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+    
     try {
-      const response = await fetch(`${BACKEND_URL}/api/transformation/all-tasks?phone=${userPhone}`);
+      const response = await fetch(`${BACKEND_URL}/api/transformation/all-tasks?phone=${userPhone}`, {
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
       if (response.ok) {
         const data = await response.json();
         setTransformationData(data);
@@ -147,8 +154,13 @@ export default function MyStyleJourneyScreen() {
         const currentWeek = Math.ceil((data.completed_tasks.length + 1) / 7) || 1;
         setExpandedWeek(Math.min(currentWeek, 4));
       }
-    } catch (error) {
-      console.log('Error fetching transformation tasks:', error);
+    } catch (error: any) {
+      clearTimeout(timeoutId);
+      if (error.name === 'AbortError') {
+        console.log('Transformation tasks fetch timed out');
+      } else {
+        console.log('Error fetching transformation tasks:', error);
+      }
     }
   };
 

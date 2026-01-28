@@ -99,18 +99,42 @@ export default function AIStylistScreen() {
   const [hasCompletedAnalysis, setHasCompletedAnalysis] = useState(false);
   const [isCheckingStatus, setIsCheckingStatus] = useState(true);
   const [welcomeSet, setWelcomeSet] = useState(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // Check status whenever screen comes into focus
   useFocusEffect(
     React.useCallback(() => {
       checkUserStatus();
+      
+      // Cleanup: abort any pending requests when leaving the tab
+      return () => {
+        if (abortControllerRef.current) {
+          abortControllerRef.current.abort();
+        }
+      };
     }, [])
   );
 
   const checkUserStatus = async () => {
+    // Abort any previous pending requests
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    
+    // Create new abort controller for this request
+    abortControllerRef.current = new AbortController();
+    const signal = abortControllerRef.current.signal;
+    
+    // Set timeout for status check (10 seconds max)
+    const timeoutId = setTimeout(() => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    }, 10000);
+    
     setIsCheckingStatus(true);
     try {
-      // Check local storage first
+      // Check local storage first (fast, no network)
       const localPremium = await AsyncStorage.getItem('sgc_is_premium');
       const localAnalysis = await AsyncStorage.getItem('sgc_has_completed_analysis');
       const localTier = await AsyncStorage.getItem('sgc_membership_tier');
@@ -124,12 +148,12 @@ export default function AIStylistScreen() {
       let analysisComplete = localAnalysis === 'true';
       let tier = localTier || 'free';
 
-      // Verify with backend for the most up-to-date status
+      // Verify with backend for the most up-to-date status (with timeout)
       try {
         // Try the new user status endpoint first
-        if (phone) {
+        if (phone && !signal.aborted) {
           const cleanPhone = phone.replace('+1', '').replace('+', '');
-          const statusResponse = await fetch(`${BACKEND_URL}/api/user/status?phone=${cleanPhone}`);
+          const statusResponse = await fetch(`${BACKEND_URL}/api/user/status?phone=${cleanPhone}`, { signal });
           if (statusResponse.ok) {
             const statusData = await statusResponse.json();
             console.log('AI Stylist - User Status:', statusData);
@@ -145,39 +169,49 @@ export default function AIStylistScreen() {
           }
         }
         
-        // Also check legacy auth status
-        const response = await fetch(`${BACKEND_URL}/api/auth/user-status`);
-        if (response.ok) {
-          const data = await response.json();
-          console.log('AI Stylist - Backend Status:', data);
-          
-          // Use backend values if they indicate premium or analysis
-          if (data.is_premium) {
-            premium = true;
+        // Also check legacy auth status (with timeout)
+        if (!signal.aborted) {
+          const response = await fetch(`${BACKEND_URL}/api/auth/user-status`, { signal });
+          if (response.ok) {
+            const data = await response.json();
+            console.log('AI Stylist - Backend Status:', data);
+            
+            // Use backend values if they indicate premium or analysis
+            if (data.is_premium) {
+              premium = true;
+            }
+            if (data.has_completed_analysis) {
+              analysisComplete = true;
+            }
+            
+            // Update local storage with backend values
+            await AsyncStorage.setItem('sgc_is_premium', premium ? 'true' : 'false');
+            await AsyncStorage.setItem('sgc_has_completed_analysis', analysisComplete ? 'true' : 'false');
           }
-          if (data.has_completed_analysis) {
-            analysisComplete = true;
-          }
-          
-          // Update local storage with backend values
-          await AsyncStorage.setItem('sgc_is_premium', premium ? 'true' : 'false');
-          await AsyncStorage.setItem('sgc_has_completed_analysis', analysisComplete ? 'true' : 'false');
         }
-      } catch (error) {
-        console.log('Backend status check failed, using local values');
+      } catch (error: any) {
+        if (error.name === 'AbortError') {
+          console.log('Status check aborted or timed out, using local values');
+        } else {
+          console.log('Backend status check failed, using local values');
+        }
       }
 
-      setIsPremium(premium);
-      setMembershipTier(tier);
-      setHasCompletedAnalysis(analysisComplete);
+      // Only update state if not aborted
+      if (!signal.aborted) {
+        setIsPremium(premium);
+        setMembershipTier(tier);
+        setHasCompletedAnalysis(analysisComplete);
 
-      // If user has completed analysis and is Style Pro, load their profile
-      if (analysisComplete && tier === 'lifestyle') {
-        await loadProfile();
+        // If user has completed analysis and is Style Pro, load their profile
+        if (analysisComplete && tier === 'lifestyle') {
+          await loadProfile();
+        }
       }
     } catch (error) {
       console.log('Error checking user status:', error);
     } finally {
+      clearTimeout(timeoutId);
       setIsCheckingStatus(false);
     }
   };
