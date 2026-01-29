@@ -148,6 +148,7 @@ export default function AccountModal({ visible, onClose }: AccountModalProps) {
         'sgc_is_premium',
         'sgc_is_verified',
         'sgc_email',
+        'sgc_email_verified',  // Clear email verification to prevent cross-user session leakage
         'user_first_name',
         'sgc_membership_tier',
       ];

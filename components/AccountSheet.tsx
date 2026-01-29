@@ -83,6 +83,7 @@ const AccountSheet = forwardRef<BottomSheet, AccountSheetProps>(({ onClose }, re
                 'sgc_is_premium',
                 'sgc_is_verified',
                 'sgc_email',
+                'sgc_email_verified',  // Clear email verification to prevent cross-user session leakage
                 // DO NOT clear these - keep analysis data:
                 // 'sgc_has_completed_analysis',
                 // 'style_engine_complete',
